@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arenas de los Faraones — Sobrevivencia 3D</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Vignette effects for damage / thirst -->
+  <div id="damage-flash" class="screen-fx"></div>
+  <div id="thirst-vignette" class="screen-fx"></div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <!-- Top Left: Survival Bars -->
+    <div class="hud-panel hud-vitals">
+      <div class="vital-row">
+        <span class="vital-icon" title="Salud">♥</span>
+        <div class="bar-track">
+          <div id="health-bar" class="bar-fill bar-health"></div>
+        </div>
+        <span id="health-text" class="vital-value">100</span>
+      </div>
+      <div class="vital-row">
+        <span class="vital-icon" title="Hidratación">💧</span>
+        <div class="bar-track">
+          <div id="water-bar" class="bar-fill bar-water"></div>
+        </div>
+        <span id="water-text" class="vital-value">100%</span>
+      </div>
+      <div class="vital-row">
+        <span class="vital-icon" title="Resistencia">⚡</span>
+        <div class="bar-track bar-small">
+          <div id="stamina-bar" class="bar-fill bar-stamina"></div>
+        </div>
+        <span id="stamina-text" class="vital-value">100</span>
+      </div>
+    </div>
+
+    <!-- Top Center: Compass Bar -->
+    <div class="hud-compass-wrap">
+      <div class="hud-compass" id="compass">
+        <span id="compass-heading">N</span>
+        <span class="compass-sep">•</span>
+        <span id="compass-hint">Busca reliquias doradas</span>
+      </div>
+      <div id="toast-container"></div>
+    </div>
+
+    <!-- Top Right: Expedition Stats & Audio -->
+    <div class="hud-panel hud-stats">
+      <div class="stat-item">
+        <span class="stat-label">TESOROS</span>
+        <span class="stat-value gold"><span id="treasure-count">0</span> / <span id="treasure-total">12</span></span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">SERPIENTES</span>
+        <span class="stat-value"><span id="snakes-killed">0</span></span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">PUNTOS</span>
+        <span class="stat-value gold" id="score-value">0</span>
+      </div>
+      <button id="mute-btn" class="icon-btn" title="Silenciar / Activar sonido">🔊</button>
+    </div>
+
+    <!-- Bottom Left: Controls reminder -->
+    <div class="hud-controls">
+      <span><b>WASD</b> Mover</span>
+      <span><b>Shift</b> Correr</span>
+      <span><b>Espacio</b> Saltar</span>
+      <span><b>Clic / F</b> Espada</span>
+      <span><b>Ratón / Q-E</b> Cámara</span>
+    </div>
+
+    <!-- Bottom Right: Desert Radar -->
+    <div class="radar-wrap">
+      <canvas id="radar-canvas" width="136" height="136"></canvas>
+      <div class="radar-legend">
+        <span class="leg-gold">● Tesoro</span>
+        <span class="leg-red">● Víbora</span>
+        <span class="leg-blue">● Oasis</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen" class="overlay">
+    <div class="modal-card">
+      <div class="eyebrow">EXPEDICIÓN ANTROPOLÓGICA • EGIPTO</div>
+      <h1>ARENAS DE LOS FARAONES</h1>
+      <p class="subtitle">
+        Explora el desierto sagrado entre las pirámides, sobrevive al calor extremo,
+        defiéndete de las serpientes venenosas con tu espada y recupera todas las reliquias antiguas.
+      </p>
+
+      <div class="controls-grid">
+        <div class="ctrl-box">
+          <div class="ctrl-key">W A S D</div>
+          <div class="ctrl-desc">Caminar / Explorar</div>
+        </div>
+        <div class="ctrl-box">
+          <div class="ctrl-key">CLIC / F</div>
+          <div class="ctrl-desc">Golpear con espada</div>
+        </div>
+        <div class="ctrl-box">
+          <div class="ctrl-key">SHIFT / ESPACIO</div>
+          <div class="ctrl-desc">Correr / Saltar</div>
+        </div>
+        <div class="ctrl-box">
+          <div class="ctrl-key">RATÓN / Q E</div>
+          <div class="ctrl-desc">Girar cámara</div>
+        </div>
+      </div>
+
+      <div class="tips-bar">
+        💡 Bebe en el <strong>Oasis</strong> o recoge cantimploras para mantener tu hidratación.
+      </div>
+
+      <button id="start-btn" class="primary-btn">INICIAR EXPEDICIÓN</button>
+    </div>
+  </div>
+
+  <!-- End Screen (Game Over / Victory) -->
+  <div id="end-screen" class="overlay hidden">
+    <div class="modal-card">
+      <div id="end-eyebrow" class="eyebrow">EXPEDICIÓN FINALIZADA</div>
+      <h1 id="end-title">HAS CAÍDO EN LAS ARENAS</h1>
+      <p id="end-message" class="subtitle"></p>
+      <div class="summary-row">
+        <div class="summary-stat">
+          <span class="summary-num" id="end-treasures">0</span>
+          <span class="summary-lbl">Tesoros</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-num" id="end-snakes">0</span>
+          <span class="summary-lbl">Serpientes</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-num" id="end-score">0</span>
+          <span class="summary-lbl">Puntuación</span>
+        </div>
+      </div>
+      <button id="restart-btn" class="primary-btn">NUEVA EXPEDICIÓN</button>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
